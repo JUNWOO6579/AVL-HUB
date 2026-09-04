@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Touch Panel Hub</title>
+    <style>
+        :root {
+            --bg-base: #0a0b0d;
+            --bg-card: #15181e;
+            --border: #262b35;
+            --accent-orange: #ff7700;
+            --accent-blue: #0088ff;
+            --accent-green: #2ecc71;
+            --accent-red: #e74c3c;
+            --text-main: #ffffff;
+            --text-muted: #808b96;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            margin: 0;
+            padding: 12px;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 상단 미니멀 상태바 */
+        .status-strip {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+        .page-badge {
+            background: var(--accent-blue);
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        /* 6버튼 고정 그리드 (2행 3열 or 2행 4열) */
+        .grid-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* 공통 터치 버튼 스타일 */
+        .touch-btn {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.08s ease;
+            text-align: center;
+            padding: 10px;
+        }
+        .touch-btn:active {
+            transform: scale(0.96);
+            border-color: var(--accent-orange);
+            background: #1f242d;
+        }
+
+        /* 매크로 실행 버튼 */
+        .macro-btn .title {
+            font-size: 20px;
+            font-weight: bold;
+            line-height: 1.2;
+            word-break: keep-all;
+        }
+        .macro-btn .desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+        .macro-btn.active {
+            border-color: var(--accent-green);
+            background: rgba(46, 204, 113, 0.12);
+        }
+
+        /* 페이지 넘김 내비게이션 버튼 */
+        .nav-btn {
+            background: #1e2430;
+            border-color: #2e3846;
+        }
+        .nav-btn:active {
+            border-color: var(--accent-blue);
+            background: #283344;
+        }
+        .nav-btn .arrow {
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+        .nav-btn .label {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 미니멀 상태바 -->
+    <div class="status-strip">
+        <span id="conn-status" style="color: var(--accent-orange); font-weight: bold;">CONNECTING...</span>
+        <div>
+            <span style="color: var(--text-muted); margin-right: 6px;">PAGE</span>
+            <span id="page-display" class="page-badge">1 / 1</span>
+        </div>
+    </div>
+
+    <!-- 고정 6버튼 레이아웃 (매크로 4개 + 이전/다음 2개) -->
+    <div class="grid-container">
+        <!-- 1행 (매크로 슬롯 1, 2 + 이전 페이지) -->
+        <div id="slot-0" class="touch-btn macro-btn" onclick="triggerSlot(0)"></div>
+        <div id="slot-1" class="touch-btn macro-btn" onclick="triggerSlot(1)"></div>
+        <div class="touch-btn nav-btn" onclick="prevPage()">
+            <span class="arrow">◀</span>
+            <span class="label">PREV PAGE</span>
+        </div>
+
+        <!-- 2행 (매크로 슬롯 3, 4 + 다음 페이지) -->
+        <div id="slot-2" class="touch-btn macro-btn" onclick="triggerSlot(2)"></div>
+        <div id="slot-3" class="touch-btn macro-btn" onclick="triggerSlot(3)"></div>
+        <div class="touch-btn nav-btn" onclick="nextPage()">
+            <span class="arrow">▶</span>
+            <span class="label">NEXT PAGE</span>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let currentPage = 0;
+        const SLOTS_PER_PAGE = 4;
+
+        // PC(index.html)에서 수정한 매크로 데이터와 동일한 LocalStorage 키 동기화
+        const defaultMacros = [
+            { name: "전체 순차 켜기", desc: "순차전원 ALL ON / 믹서 준비", power: 1, snap: 1, unmutes: ["ch/1"], ptz_cam: 1, ptz: 1 },
+            { name: "설교 / 발언", desc: "강단 마이크 오픈 / 타이트 샷", snap: 2, unmutes: ["ch/1"], mutes: ["ch/2","ch/3"], ptz_cam: 1, ptz: 2, switcher: 2 },
+            { name: "찬양 / 밴드", desc: "악기군 오픈 / 와이드 풀샷", snap: 3, unmutes: ["ch/1","ch/2","ch/3","ch/4","ch/5","ch/6","ch/7","ch/8"], ptz_cam: 2, ptz: 3, switcher: 1 },
+            { name: "성찬 / 기도", desc: "차분한 조명 / BGM 채널만 오픈", snap: 1, unmutes: ["ch/5"], mutes: ["ch/1","ch/2","ch/3"], ptz_cam: 1, ptz: 4 },
+            { name: "영상 상영", desc: "PC 오디오 오픈 / 스위처 PPT", snap: 1, unmutes: ["aux/1","aux/2"], switcher: 4 },
+            { name: "전체 순차 끄기", desc: "All Mute / 순차전원 OFF", snap: 1, unmutes: [], mutes: ["ch/1","ch/2","ch/3"], ptz_cam: 1, ptz: 8, power: 0 }
+        ];
+
+        let macros = JSON.parse(localStorage.getItem("master_macros_v2")) || defaultMacros;
+
+        function connectWS() {
+            ws = new WebSocket(`ws://${location.hostname}:8765`);
+
+            ws.onopen = () => {
+                document.getElementById("conn-status").textContent = "CONNECTED (ONLINE)";
+                document.getElementById("conn-status").style.color = "var(--accent-green)";
+            };
+
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === "system" && data.log) {
+                    document.getElementById("conn-status").textContent = data.log;
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById("conn-status").textContent = "DISCONNECTED";
+                document.getElementById("conn-status").style.color = "var(--accent-red)";
+                setTimeout(connectWS, 2000);
+            };
+        }
+
+        function renderPage() {
+            const totalPages = Math.max(1, Math.ceil(macros.length / SLOTS_PER_PAGE));
+            if (currentPage >= totalPages) currentPage = totalPages - 1;
+
+            document.getElementById("page-display").textContent = `${currentPage + 1} / ${totalPages}`;
+
+            for (let i = 0; i < SLOTS_PER_PAGE; i++) {
+                const globalIdx = currentPage * SLOTS_PER_PAGE + i;
+                const slotEl = document.getElementById(`slot-${i}`);
+                const item = macros[globalIdx];
+
+                if (item) {
+                    slotEl.style.visibility = "visible";
+                    slotEl.innerHTML = `
+                        <div class="title">${item.name}</div>
+                        <div class="desc">${item.desc || ""}</div>
+                    `;
+                } else {
+                    slotEl.style.visibility = "hidden";
+                    slotEl.innerHTML = "";
+                }
+            }
+        }
+
+        function prevPage() {
+            const totalPages = Math.max(1, Math.ceil(macros.length / SLOTS_PER_PAGE));
+            currentPage = (currentPage - 1 + totalPages) % totalPages;
+            renderPage();
+        }
+
+        function nextPage() {
+            const totalPages = Math.max(1, Math.ceil(macros.length / SLOTS_PER_PAGE));
+            currentPage = (currentPage + 1) % totalPages;
+            renderPage();
+        }
+
+        function triggerSlot(slotIdx) {
+            const globalIdx = currentPage * SLOTS_PER_PAGE + slotIdx;
+            const targetMacro = macros[globalIdx];
+            if (!targetMacro || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // 시각적 터치 피드백
+            const slotEl = document.getElementById(`slot-${slotIdx}`);
+            slotEl.classList.add("active");
+            setTimeout(() => slotEl.classList.remove("active"), 350);
+
+            ws.send(JSON.stringify({
+                type: "master_macro",
+                macro: targetMacro
+            }));
+        }
+
+        renderPage();
+        connectWS();
+    </script>
+</body>
+</html>

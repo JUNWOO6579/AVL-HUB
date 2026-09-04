@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Hub & Production Control</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- 0. 시스템 보안 로그인 화면 (로그인 전 전체 차단) -->
+    <div id="login-overlay" class="login-container">
+        <div class="login-card">
+            <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+                <img src="logo.png" alt="Logo" style="height: 48px;" onerror="this.style.display='none'">
+            </div>
+            <div class="login-title">통합 방송제어 시스템</div>
+        
+
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label>아이디 (ID)</label>
+                    <input type="text" id="login-id" placeholder="ID 입력" required autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-bottom: 18px;">
+                    <label>비밀번호 (Password)</label>
+                    <input type="password" id="login-pw" placeholder="PW 입력" required>
+                </div>
+                <div id="login-error" class="login-err-msg">아이디 또는 비밀번호가 일치하지 않습니다.</div>
+                <button type="submit" class="fluent-btn primary" style="width: 100%; height: 44px; font-size: 14px;">로그인</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 좌측 사이드바 -->
+    <div class="sidebar">
+        <div class="sidebar-header" onclick="goToHome(event)" style="cursor: pointer; user-select: none;" title="메인 화면으로 이동">
+            <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
+            <span class="sidebar-title">TX-C</span>
+        </div>
+        <div class="nav-menu">
+            <div class="nav-item active" data-view="overview" onclick="switchView('overview')">AVL 프리셋</div>
+            <div class="nav-item" data-view="audio" onclick="switchView('audio')">음향 콘솔 메뉴</div>
+            <div class="nav-item" data-view="ptz" onclick="switchView('ptz')">카메라 메뉴</div>
+            <div class="nav-item" data-view="switcher" onclick="switchView('switcher')">비디오 스위처 메뉴</div>
+            <div class="nav-item" data-view="power" onclick="switchView('power')">순차전원분배기 메뉴</div>
+            <div class="nav-item" data-view="scheduler" onclick="switchView('scheduler')">스케줄러 동기화</div>
+            <div class="nav-item" data-view="deck" onclick="switchView('deck')">스트림덱 배치 메뉴</div>
+            <div class="nav-item" data-view="settings" onclick="switchView('settings')" style="margin-top: auto;">⚙ 설정</div>
+        </div>
+        <div class="nav-item" onclick="handleLogout()" style="color: var(--accent-red); border-top: 1px solid var(--border); margin-top: 8px; padding-top: 12px; cursor: pointer;">
+                    로그아웃
+                </div>
+    </div>
+
+    <!-- 우측 메인 작업 영역 -->
+    <div class="main-view">
+        <!-- 1. 씬 매크로 -->
+        <div id="view-overview" class="view-section active">
+            <div class="view-header">
+                <div class="view-title">AVL PRESET</div>
+                <span id="active-info" style="font-size: 13px; color: var(--accent);">연결 대기 중...</span>
+            </div>
+            <div class="macro-grid" id="macro-container"></div>
+        </div>
+
+        <!-- 2. 음향 콘솔 랙 -->
+        <div id="view-audio" class="view-section">
+            <div class="view-header">
+                <div class="view-title">음향 콘솔 MENU</div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <select id="snap-select" style="padding: 6px 12px; background: var(--bg-input); color:#fff; border: 1px solid var(--border); border-radius: 4px; min-width: 220px; font-size: 12px;"></select>
+                    <button class="fluent-btn primary" onclick="loadSnapshot()">스냅샷 로드</button>
+                    <button class="fluent-btn" onclick="navRecall('prev')">◀ 이전</button>
+                    <button class="fluent-btn" onclick="navRecall('next')">다음 ▶</button>
+                </div>
+            </div>
+            
+            <div class="bank-tabs">
+                <button class="bank-btn active" onclick="switchBank('1-12', this)">CH 1-12</button>
+                <button class="bank-btn" onclick="switchBank('13-24', this)">CH 13-24</button>
+                <button class="bank-btn" onclick="switchBank('25-36', this)">CH 25-36</button>
+                <button class="bank-btn" onclick="switchBank('37-40', this)">CH 37-40 & AUX</button>
+                <button class="bank-btn" onclick="switchBank('dca', this)">DCA & 메인 L/R</button>
+            </div>
+            
+            <div class="fader-rack" id="fader-rack"></div>
+        </div>
+
+        <!-- 3. PTZ 카메라 -->
+        <div id="view-ptz" class="view-section">
+            <div class="view-header">
+                <div class="view-title">CAM CTL MENU</div>
+                <div id="ptz-port-display" style="font-size: 12px; color: var(--accent-orange);">모드: VISCA over IP (UDP 52381)</div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div class="bank-tabs" id="ptz-cam-tabs" style="margin-bottom: 0;"></div>
+                <div style="display: flex; gap: 6px;">
+                    <button class="fluent-btn" onclick="addNewPTZCam()" style="color: var(--accent-orange); border-color: var(--accent-orange);">+ 카메라 추가</button>
+                    <button class="fluent-btn" onclick="removeActivePTZCam()" style="color: var(--accent-red); border-color: var(--accent-red);">- 제거</button>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 13px; font-weight: bold; color: var(--accent-orange);" id="current-cam-label">CAM 1 설정</span>
+                    <input type="text" id="ptz-target-name" placeholder="카메라 명칭" style="width: 110px; padding: 4px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: #fff; font-size: 12px;">
+                    <input type="text" id="ptz-target-ip" placeholder="IP" style="width: 130px; padding: 4px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: #fff; font-size: 12px;">
+                    <input type="number" id="ptz-target-port" placeholder="포트" style="width: 70px; padding: 4px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: #fff; font-size: 12px;">
+                </div>
+                <button class="fluent-btn primary" onclick="savePTZCamConfig()">카메라 설정 저장</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;" id="ptz-preset-grid"></div>
+        </div>
+
+        <!-- 4. 비디오 스위처 -->
+        <div id="view-switcher" class="view-section">
+            <div class="view-header">
+                <div class="view-title">VIDEO SWITCHER MENU</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(1)">카메라 1 (PGM)</button>
+                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(2)">카메라 2 (PGM)</button>
+                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(3)">카메라 3 (PGM)</button>
+                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(4)">PC / PPT 화면</button>
+            </div>
+        </div>
+
+        <!-- 5. 순차전원 -->
+        <div id="view-power" class="view-section">
+            <div class="view-header">
+                <div class="view-title">순차전원분배기 제어</div>
+            </div>
+            <div style="display: flex; gap: 16px;">
+                <button class="fluent-btn primary" style="flex:1; height:70px; font-size: 15px; background: var(--accent-green); border-color: var(--accent-green);" onclick="sendPower(0, 1)">전체 전원 순차 켜기 (ALL ON)</button>
+                <button class="fluent-btn" style="flex:1; height:70px; font-size: 15px; border-color: var(--accent-red); color: var(--accent-red);" onclick="sendPower(0, 0)">전체 전원 순차 끄기 (ALL OFF)</button>
+            </div>
+        </div>
+
+        <!-- 6. 스트림덱 배치 & 페이지 매핑 -->
+        <div id="view-deck" class="view-section">
+            <div class="view-header">
+                <div class="view-title">스트림덱 미니 (6키) 물리 배치 & 페이지 프리뷰</div>
+                <button class="fluent-btn primary" onclick="saveDeckLayout()">기기에 즉시 적용 및 저장</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px;">
+                <div id="deck-slot-0" class="deck-slot-box"></div>
+                <div id="deck-slot-1" class="deck-slot-box"></div>
+                <div id="deck-slot-2" class="deck-slot-box"></div>
+                <div id="deck-slot-3" class="deck-slot-box"></div>
+                <div id="deck-slot-4" class="deck-slot-box"></div>
+                <div id="deck-slot-5" class="deck-slot-box"></div>
+            </div>
+
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 13px; font-weight: bold; color: var(--accent-orange);">이전 / 다음 페이지 매핑 미리보기</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button class="fluent-btn" style="padding: 3px 10px;" onclick="changeDeckPreviewPage(-1)">◀</button>
+                        <span id="deck-preview-page-indicator" style="font-size: 12px; font-weight: bold;">Page 1 / 1</span>
+                        <button class="fluent-btn" style="padding: 3px 10px;" onclick="changeDeckPreviewPage(1)">▶</button>
+                    </div>
+                </div>
+                <div id="deck-live-preview-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
+            </div>
+
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px;">
+                <div style="font-size: 13px; font-weight: bold; color: #a5d6ff; margin-bottom: 8px;">매크로 순서 재정렬 (▲/▼ 버튼으로 페이지 위치 변경)</div>
+                <div id="deck-macro-order-list" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+        </div>
+
+        <div id="view-scheduler" class="view-section">
+                <div class="view-header">
+                    <div>
+                        <div class="view-title">자동화 이벤트 스케줄러</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">지정된 요일과 시각에 등록된 씬 매크로를 자동으로 트리거합니다.</div>
+                    </div>
+                    <button class="fluent-btn primary" onclick="openNewScheduleModal()">+ 새 스케줄 등록</button>
+                </div>
+
+                <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                                <th style="padding: 12px 16px;">상태</th>
+                                <th style="padding: 12px 16px;">스케줄 명칭</th>
+                                <th style="padding: 12px 16px;">실행 요일</th>
+                                <th style="padding: 12px 16px;">실행 시각</th>
+                                <th style="padding: 12px 16px;">연동 씬 매크로</th>
+                                <th style="padding: 12px 16px; text-align: right;">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-list-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        <!-- 7. 하드웨어 설정 -->
+        <div id="view-settings" class="view-section">
+            <div class="view-header">
+                <div class="view-title">하드웨어 연결 & 통신 설정</div>
+                <button class="fluent-btn primary" onclick="saveConfig()">설정 저장 및 연결 적용</button>
+            </div>
+            <div class="setting-grid">
+                <div class="form-group">
+                    <label>콘솔 제조사</label>
+                    <select id="cfg-brand" onchange="onBrandChange()">
+                        <option value="Behringer">Behringer</option>
+                        <option value="Yamaha">YAMAHA</option>
+                        <option value="AllenHeath">Allen & Heath</option>
+                        <option value="Midas">Midas</option>
+                        <option value="DiGiCo">DiGiCo</option>
+                        <option value="Soundcraft">Soundcraft</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>세부 콘솔 기종</label>
+                    <select id="cfg-model" onchange="onModelChange()"></select>
+                </div>
+                <div class="form-group">
+                    <label>콘솔 IP 주소</label>
+                    <input type="text" id="cfg-audio-ip" value="192.168.219.106">
+                </div>
+                <div class="form-group">
+                    <label>콘솔 통신 포트</label>
+                    <input type="number" id="cfg-audio-port" value="2223">
+                </div>
+                <div class="form-group">
+                    <label>비디오 스위처 IP</label>
+                    <input type="text" id="cfg-switcher-ip" value="192.168.219.110">
+                </div>
+                <div class="form-group">
+                    <label>순차전원분배기 IP</label>
+                    <input type="text" id="cfg-power-ip" value="192.168.219.140">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 매크로 편집 전용 모달 (화면 밖 팝업 격리 완료) -->
+    <div id="modal-macro-edit" class="modal">
+        <div class="modal-content" style="width: 480px; max-width: 90vw;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <h3 id="macro-modal-title" style="font-size: 16px;">원클릭 씬 매크로 설정</h3>
+                <button class="btn-card-act" style="font-size: 16px;" onclick="closeModal('macro-edit')">✕</button>
+            </div>
+            <div class="form-group">
+                <label>버튼 명칭</label>
+                <input type="text" id="m-edit-title" placeholder="예: 설교 / 발언">
+            </div>
+            <div class="form-group">
+                <label>설명</label>
+                <input type="text" id="m-edit-desc" placeholder="예: 강단 마이크 오픈 / 타이트 샷">
+            </div>
+            <div class="form-group">
+                <label>순차전원 제어</label>
+                <select id="m-edit-power">
+                    <option value="">(동작 없음)</option>
+                    <option value="1">전체 전원 순차 켜기 (ON)</option>
+                    <option value="0">전체 전원 순차 끄기 (OFF)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>콘솔 스냅샷 번호 (씬 ID)</label>
+                <input type="number" id="m-edit-snap" placeholder="스냅샷을 넘기지 않으려면 빈칸">
+            </div>
+            <div class="form-group">
+                <label>언뮤트할 채널 (쉼표 구분: ch/1,ch/2)</label>
+                <input type="text" id="m-edit-unmute" placeholder="ch/1,ch/2">
+            </div>
+            <div class="form-group">
+                <label>뮤트할 채널 (쉼표 구분: ch/3,ch/4)</label>
+                <input type="text" id="m-edit-mute" placeholder="ch/3,ch/4">
+            </div>
+            <div class="form-group">
+                <label>PTZ 카메라 / 프리셋</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="number" id="m-edit-ptz-cam" placeholder="카메라 번호" style="width: 50%;">
+                    <input type="number" id="m-edit-ptz" placeholder="프리셋 번호" style="width: 50%;">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>비디오 스위처 PGM 채널</label>
+                <input type="number" id="m-edit-switcher" placeholder="예: 2 (CAM 2)">
+            </div>
+            <button class="fluent-btn primary" style="width: 100%; height: 42px; margin-top: 12px;" onclick="saveMacroEdit()">저장 완료</button>
+        </div>
+    </div>
+
+<!-- 동기화 로딩 오버레이 모달 -->
+<div id="modal-sync-loading" class="modal" style="background: rgba(0, 0, 0, 0.85); z-index: 1000000;">
+    <div class="modal-content" style="width: 320px; text-align: center; padding: 30px 20px;">
+        <div style="font-size: 28px; margin-bottom: 12px; animation: spin 1.5s linear infinite;">⏳</div>
+        <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">콘솔 동기화 중</div>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+            하드웨어 채널 및 스냅샷 데이터를<br>불러오는 중입니다. 잠시만 기다려주세요.
+        </div>
+    </div>
+</div>
+
+<div id="modal-schedule-edit" class="modal">
+        <div class="modal-content" style="width: 420px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 id="sched-modal-title" style="font-size: 16px;">자동화 스케줄 등록</h3>
+                <button class="btn-card-act" onclick="closeModal('schedule-edit')">✕</button>
+            </div>
+            <div class="form-group">
+                <label>스케줄 명칭</label>
+                <input type="text" id="sched-name" placeholder="예: 주일 1부 예배 준비">
+            </div>
+            <div class="form-group">
+                <label>실행 요일 (다중 선택)</label>
+                <div style="display: flex; gap: 4px;" id="sched-days-group">
+                    <button type="button" class="bank-btn day-btn" data-day="0">일</button>
+                    <button type="button" class="bank-btn day-btn" data-day="1">월</button>
+                    <button type="button" class="bank-btn day-btn" data-day="2">화</button>
+                    <button type="button" class="bank-btn day-btn" data-day="3">수</button>
+                    <button type="button" class="bank-btn day-btn" data-day="4">목</button>
+                    <button type="button" class="bank-btn day-btn" data-day="5">금</button>
+                    <button type="button" class="bank-btn day-btn" data-day="6">토</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>실행 시간 (HH:MM)</label>
+                <input type="time" id="sched-time" style="color-scheme: dark;">
+            </div>
+            <div class="form-group">
+                <label>실행할 씬 매크로</label>
+                <select id="sched-macro-select"></select>
+            </div>
+            <button class="fluent-btn primary" style="width: 100%; height: 42px; margin-top: 10px;" onclick="saveScheduleItem()">스케줄 저장</button>
+        </div>
+    </div>
+
+<style>
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
+    <script src="app.js"></script>
+</body>
+</html>

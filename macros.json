@@ -1,0 +1,112 @@
+{
+  "macros": [
+    {
+      "name": "전체 순차 켜기",
+      "desc": "순차전원 ALL ON / 믹서 준비",
+      "power": 1,
+      "snap": 1,
+      "unmutes": [
+        "ch/1"
+      ],
+      "mutes": [],
+      "ptz_cam": 1,
+      "ptz": 1,
+      "switcher": 1
+    },
+    {
+      "name": "설교 / 발언",
+      "desc": "강단 마이크 오픈 / 타이트 샷",
+      "snap": 2,
+      "unmutes": [
+        "ch/1"
+      ],
+      "mutes": [
+        "ch/2",
+        "ch/3"
+      ],
+      "ptz_cam": 1,
+      "ptz": 2,
+      "switcher": 2
+    },
+    {
+      "name": "찬양 / 밴드",
+      "desc": "악기군 오픈 / 와이드 풀샷",
+      "snap": 3,
+      "unmutes": [
+        "ch/1",
+        "ch/2",
+        "ch/3",
+        "ch/4"
+      ],
+      "ptz_cam": 2,
+      "ptz": 3,
+      "switcher": 1
+    },
+    {
+      "name": "새벽예배",
+      "desc": "차분한 조명 / BGM 채널만 오픈",
+      "power": null,
+      "snap": 1,
+      "unmutes": [
+        "ch/5"
+      ],
+      "mutes": [
+        "ch/1"
+      ],
+      "ptz_cam": 1,
+      "ptz": 4,
+      "switcher": null
+    },
+    {
+      "name": "영상 상영",
+      "desc": "PC 오디오 오픈 / 스위처 PPT",
+      "snap": 1,
+      "unmutes": [
+        "aux/1",
+        "aux/2"
+      ],
+      "switcher": 4
+    },
+    {
+      "name": "전체 순차 끄기",
+      "desc": "All Mute / 순차전원 OFF",
+      "power": 0,
+      "snap": 1,
+      "mutes": [
+        "ch/1",
+        "ch/2"
+      ]
+    }
+  ],
+  "deck_layout": [
+    {
+      "type": "macro"
+    },
+    {
+      "type": "macro"
+    },
+    {
+      "type": "prev"
+    },
+    {
+      "type": "macro"
+    },
+    {
+      "type": "macro"
+    },
+    {
+      "type": "next"
+    }
+  ],
+  "schedules": [
+    {
+      "name": "주일 1부 예배",
+      "time": "09:00",
+      "days": [
+        0
+      ],
+      "macro_idx": 0,
+      "enabled": true
+    }
+  ]
+}

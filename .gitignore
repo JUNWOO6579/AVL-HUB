@@ -1,0 +1,13 @@
+# 파이썬 가상환경 및 캐시
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# OS 및 에디터 설정
+.DS_Store
+.vscode/
+
+# 임시 저장본
+*.save
+*.tmp

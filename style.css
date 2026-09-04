@@ -1,0 +1,425 @@
+:root {
+    --bg-base: #0b0d13;
+    --bg-sidebar: #12151c;
+    --bg-surface: #181c24;
+    --bg-card: #202530;
+    --bg-input: #12151c;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --accent: #0078d4;
+    --accent-orange: #ff7700;
+    --accent-red: #e03131;
+    --accent-green: #2f9e44;
+    --text-main: #f8f9fa;
+    --text-muted: #8c95a5;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: var(--bg-base);
+    background-image: 
+        radial-gradient(ellipse at 15% 0%, rgba(0, 120, 212, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 0%, rgba(255, 119, 0, 0.12) 0%, transparent 50%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Nanum Gothic", sans-serif;
+    color: var(--text-main);
+    display: flex;
+    user-select: none;
+}
+
+/* 1. 좌측 컴팩트 사이드바 */
+.sidebar {
+    width: 210px;
+    height: 100vh;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 10px;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+
+.sidebar-header img {
+    height: 24px;
+}
+
+.sidebar-title {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: -0.3px;
+}
+
+.nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+.nav-item.active {
+    background: rgba(0, 120, 212, 0.18);
+    color: #fff;
+    border-left: 3px solid var(--accent);
+    font-weight: bold;
+}
+
+/* 2. 메인 컨텐츠 영역 (화면 전체 꽉 차게) */
+.main-view {
+    flex: 1;
+    height: 100vh;
+    padding: 20px 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+    flex-shrink: 0;
+}
+
+.view-title {
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: -0.5px;
+}
+
+.view-section {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+}
+
+.view-section.active {
+    display: flex;
+}
+
+/* 3. 공용 버튼 & 컨트롤 */
+.fluent-btn {
+    background: #252a34;
+    border: 1px solid var(--border-strong);
+    color: var(--text-main);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.fluent-btn:hover { background: #323846; }
+.fluent-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.fluent-btn.primary:hover { background: #1084d9; }
+
+/* 4. 씬 매크로 카드 그리드 */
+.macro-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.macro-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 120px;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.1s, border-color 0.2s;
+}
+.macro-card:hover {
+    border-color: var(--accent-orange);
+    background: var(--bg-card);
+}
+.macro-card:active { transform: scale(0.98); }
+.macro-card .title { font-size: 16px; font-weight: bold; }
+.macro-card .desc { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.4; }
+
+.macro-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+}
+.btn-card-act {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 4px;
+    padding: 3px 6px;
+}
+.btn-card-act:hover { color: #fff; background: rgba(255,255,255,0.2); }
+
+.add-card {
+    border: 2px dashed #303746;
+    background: rgba(24, 28, 36, 0.4);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-weight: bold;
+    cursor: pointer;
+    min-height: 120px;
+}
+.add-card:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 5. 음향 콘솔 랙 (12채널 정상 복구 핵심) */
+.bank-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.bank-btn {
+    background: #1e232d;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+}
+.bank-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.fader-rack {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(70px, 1fr));
+    gap: 10px;
+    background: #0e1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 12px;
+    min-height: 480px;
+    overflow-x: auto;
+}
+
+.strip {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.strip-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--text-main);
+    text-align: center;
+}
+
+.btn-mute {
+    width: 90%;
+    height: 32px;
+    background: #252a34;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-weight: bold;
+    font-size: 11px;
+    cursor: pointer;
+}
+.btn-mute.active {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+    color: #fff;
+}
+
+.fader-box {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+}
+
+.slider {
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
+    width: 24px;
+    height: 260px;
+    cursor: pointer;
+}
+
+/* 6. 스트림덱 & 설정 그리드 */
+.deck-slot-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.deck-slot-title { font-size: 12px; font-weight: bold; color: #00d2ff; }
+
+.setting-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    max-width: 800px;
+}
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.form-group label { font-size: 12px; color: var(--text-muted); }
+.form-group input, .form-group select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+/* 7. [핵심] 팝업 모달 정상화 (화면 밖 침범 원천 차단) */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+}
+.modal.open {
+    display: flex !important;
+}
+.modal-content {
+    background: #161a22;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+/* 로그인 전체 화면 오버레이 */
+.login-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0b0d13;
+    background-image: 
+        radial-gradient(ellipse at 50% 30%, rgba(0, 120, 212, 0.2) 0%, transparent 60%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+    z-index: 999999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-card {
+    width: 360px;
+    background: rgba(24, 28, 36, 0.95);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 32px 28px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(20px);
+}
+
+.login-title {
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 4px;
+    color: #fff;
+}
+
+.login-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.login-err-msg {
+    display: none;
+    font-size: 12px;
+    color: var(--accent-red);
+    margin-bottom: 12px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.sidebar-header {
+    transition: opacity 0.15s ease;
+}
+.sidebar-header:hover {
+    opacity: 0.8;
+}
+.sidebar-header:active {
+    transform: scale(0.98);
+}

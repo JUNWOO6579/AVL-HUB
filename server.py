@@ -31,12 +31,12 @@ async def scheduler_loop():
                             macro_idx = item.get("macro_idx")
                             if 0 <= macro_idx < len(macros):
                                 target_macro = macros[macro_idx]
-                                print(f"[스케줄 자동 실행] {item.get('name')} -> {target_macro.get('name')}")
+                                print(f"[스케줄 자동 실행] {item.get('name')} -> {target_macro.get('name')}", flush=True)
                                 asyncio.create_task(execute_macro_step(target_macro))
                 
                 last_executed_minute = current_time
         except Exception as e:
-            print(f"[Scheduler Error] {e}")
+            print(f"[Scheduler Error] {e}", flush=True)
 
         await asyncio.sleep(1)
 
@@ -45,7 +45,7 @@ from consoles import create_console_driver
 from ptz import PTZController
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MACRO_FILE = os.path.join(BASE_DIR, "macros.json")
+MACRO_FILE = os.path.join(BASE_DIR, "hub_config.json")
 
 DEFAULT_DATA = {
     "macros": [
@@ -56,13 +56,14 @@ DEFAULT_DATA = {
         {"name": "영상 상영", "desc": "PC 오디오 오픈 / 스위처 PPT", "snap": 1, "unmutes": ["aux/1", "aux/2"], "switcher": 4},
         {"name": "전체 순차 끄기", "desc": "All Mute / 순차전원 OFF", "power": 0, "snap": 1, "mutes": ["ch/1", "ch/2"]}
     ],
-    "deck_layout": [
-        {"type": "macro", "index": 0},
-        {"type": "macro", "index": 1},
-        {"type": "prev"},
-        {"type": "macro", "index": 2},
-        {"type": "macro", "index": 3},
-        {"type": "next"}
+    "deck_pages": [
+        [
+            {"title": "전체 켜기", "icon": "⚡", "macro_idx": 0},
+            {"title": "설교/발언", "icon": "🎙️", "macro_idx": 1},
+            {"title": "찬양/밴드", "icon": "🎸", "macro_idx": 2},
+            {"title": "성찬/기도", "icon": "🕯️", "macro_idx": 3},
+            {"title": "영상 상영", "icon": "🎬", "macro_idx": 4}
+        ]
     ],
     "schedules": [
         {"name": "매일 아침 9시", "enabled": True, "days": [0, 1, 2, 3, 4, 5, 6], "time": "09:00", "macro_idx": 0},
@@ -76,31 +77,34 @@ def load_hub_data():
             with open(MACRO_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
                 if "macros" in d:
+                    if "deck_pages" not in d and "deck_layout" in d:
+                        d["deck_pages"] = [d["deck_layout"][:5]]
                     return d
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[LOAD ERR] {e}", flush=True)
     return DEFAULT_DATA
 
 def save_hub_data(data):
-    with open(MACRO_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(MACRO_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"[파일 저장 성공] {MACRO_FILE} 에 기록 완료", flush=True)
+    except Exception as e:
+        print(f"[SAVE ERR] {e}", flush=True)
 
 # ==============================================================================
 # 1. 통합 네트워크 설정
 # ==============================================================================
 CONFIG = {
-    # 음향 콘솔 (consoles/ 팩토리 연동: WING, X32, XR18, DM3 등 20+ 확장 지원)
     "AUDIO_TYPE": "WING",
     "AUDIO_IP": "192.168.219.106",
     "AUDIO_PORT": 2223,
 
-    # 비디오 스위처 & 조명
     "SWITCHER_IP": "192.168.219.110",
     "SWITCHER_PORT": 9910,
     "LIGHT_IP": "192.168.219.120",
     "LIGHT_PORT": 8000,
 
-    # PTZ 카메라 듀얼 모드 ("IP" 또는 "RS422") 및 카메라 동적 딕셔너리
     "PTZ_MODE": "IP",
     "PTZ_SERIAL_PORT": "/dev/ttyUSB0",
     "PTZ_BAUDRATE": 9600,
@@ -111,7 +115,6 @@ CONFIG = {
         "4": {"ip": "192.168.219.134", "port": 52381}
     },
 
-    # 순차전원 & 웹/소켓 포트
     "POWER_IP": "192.168.219.140",
     "POWER_PORT": 4001,
     "HTTP_PORT": 8080,
@@ -157,10 +160,9 @@ def init_audio_driver(console_type: str, ip: str, port: int = None):
     if port:
         CONFIG["AUDIO_PORT"] = port
 
-    # 팩토리 함수를 통한 드라이버 인스턴스 생성 및 바인딩
     active_driver = create_console_driver(console_type, ip, CONFIG["AUDIO_PORT"])
     active_driver.bind_broadcast(sync_broadcast)
-    print(f"[*] 오디오 드라이버 준비 완료: {console_type} ({ip}:{CONFIG['AUDIO_PORT']})")
+    print(f"[*] 오디오 드라이버 준비 완료: {console_type} ({ip}:{CONFIG['AUDIO_PORT']})", flush=True)
 
 # ==============================================================================
 # 3. 비디오 스위처, 조명, 전원 제어
@@ -170,7 +172,7 @@ def send_switcher_cut(channel: int):
     try:
         aux_sock.sendto(cmd, (CONFIG["SWITCHER_IP"], CONFIG["SWITCHER_PORT"]))
     except Exception as e:
-        print(f"[SWITCHER ERR] {e}")
+        print(f"[SWITCHER ERR] {e}", flush=True)
 
 def send_lighting_cue(cue_num: float):
     cue_str = f"Goto Cue {cue_num}"
@@ -180,14 +182,14 @@ def send_lighting_cue(cue_num: float):
     try:
         aux_sock.sendto(addr, (CONFIG["LIGHT_IP"], CONFIG["LIGHT_PORT"]))
     except Exception as e:
-        print(f"[LIGHT ERR] {e}")
+        print(f"[LIGHT ERR] {e}", flush=True)
 
 def send_power_relay(channel: int, state: int):
     cmd = f"RELAY,{channel},{state}\r\n".encode("ascii")
     try:
         aux_sock.sendto(cmd, (CONFIG["POWER_IP"], CONFIG["POWER_PORT"]))
     except Exception as e:
-        print(f"[POWER ERR] {e}")
+        print(f"[POWER ERR] {e}", flush=True)
 
 # ==============================================================================
 # 4. 통합 원클릭 매크로 시퀀서
@@ -205,19 +207,16 @@ async def execute_macro_step(macro_data: dict):
     if power is not None:
         send_power_relay(0, int(power))
 
-    # 콘솔 공통 씬 리콜 인터페이스
     if active_driver and snap is not None:
         active_driver.handle_recall("direct", int(snap))
         await asyncio.sleep(0.25)
 
-    # 콘솔 공통 채널 뮤트/언뮤트 인터페이스
     if active_driver:
         for ch in unmutes:
             active_driver.handle_mute(str(ch), 0)
         for ch in mutes:
             active_driver.handle_mute(str(ch), 1)
 
-    # PTZ 카메라 동적 프리셋 호출
     if ptz_preset is not None:
         ptz_ctrl.send_preset(int(ptz_cam), int(ptz_preset), CONFIG["PTZ_CAMERAS"])
 
@@ -234,6 +233,7 @@ async def execute_macro_step(macro_data: dict):
 # ==============================================================================
 async def ws_handler(websocket):
     connected_clients.add(websocket)
+    print(f"[WS 접속] 클라이언트 연결됨. 현재 총 접속 수: {len(connected_clients)}", flush=True)
     try:
         await websocket.send(json.dumps({
             "type": "sys_config",
@@ -244,16 +244,18 @@ async def ws_handler(websocket):
         await websocket.send(json.dumps({
             "type": "hub_sync",
             "macros": hub_data.get("macros", []),
-            "deck_layout": hub_data.get("deck_layout", DEFAULT_DATA["deck_layout"])
+            "deck_pages": hub_data.get("deck_pages", DEFAULT_DATA["deck_pages"]),
+            "schedules": hub_data.get("schedules", [])
         }))
 
         if active_driver and hasattr(active_driver, "load_metadata"):
             await active_driver.load_metadata()
 
-            # [추가] 초기 로드 완료 신호
         await websocket.send(json.dumps({"type": "sync_complete"}))
 
         async for msg in websocket:
+            # 수신 패킷을 즉시 터미널에 로깅
+            print(f"[WS 수신 Raw] {msg[:100]}...", flush=True)
             data = json.loads(msg)
             c_type = data.get("type")
 
@@ -270,32 +272,42 @@ async def ws_handler(websocket):
                 ptz_ctrl.update_config(CONFIG["PTZ_MODE"], CONFIG["PTZ_SERIAL_PORT"], CONFIG["PTZ_BAUDRATE"])
                 await broadcast({"type": "sys_config", "config": CONFIG})
 
-                # 메타데이터 로드 수행
                 if active_driver and hasattr(active_driver, "load_metadata"):
                     await active_driver.load_metadata()
 
-                # [추가] 동기화 완료 알림 발송
                 await broadcast({"type": "sync_complete"})
+
+            elif c_type in ("master_macro_by_idx", "run_deck_macro"):
+                m_idx = data.get("macro_idx")
+                current_data = load_hub_data()
+                all_macros = current_data.get("macros", [])
+                if m_idx is not None and 0 <= m_idx < len(all_macros):
+                    asyncio.create_task(execute_macro_step(all_macros[m_idx]))
 
             elif c_type == "master_macro":
                 asyncio.create_task(execute_macro_step(data.get("macro")))
 
+            # 다중 페이지 저장 및 브로드캐스트
             elif c_type in ("update_hub_data", "update_macros"):
                 current_data = load_hub_data()
                 new_macros = data.get("macros", current_data.get("macros", []))
-                new_layout = data.get("deck_layout", current_data.get("deck_layout", DEFAULT_DATA["deck_layout"]))
+                new_pages = data.get("deck_pages", current_data.get("deck_pages", DEFAULT_DATA["deck_pages"]))
+
+                print(f"[서버] update_hub_data 수신: {len(new_pages)}개 페이지 저장 진행", flush=True)
 
                 save_hub_data({
                     "macros": new_macros,
-                    "deck_layout": new_layout,
+                    "deck_pages": new_pages,
                     "schedules": current_data.get("schedules", [])
                 })
+
                 await broadcast({
                     "type": "hub_sync",
                     "macros": new_macros,
-                    "deck_layout": new_layout,
+                    "deck_pages": new_pages,
                     "schedules": current_data.get("schedules", [])
                 })
+                print(f"[서버] 전체 클라이언트로 hub_sync 브로드캐스트 완료", flush=True)
 
             elif c_type == "update_schedules":
                 current_data = load_hub_data()
@@ -304,7 +316,7 @@ async def ws_handler(websocket):
                 await broadcast({
                     "type": "hub_sync",
                     "macros": current_data.get("macros", []),
-                    "deck_layout": current_data.get("deck_layout", DEFAULT_DATA["deck_layout"]),
+                    "deck_pages": current_data.get("deck_pages", DEFAULT_DATA["deck_pages"]),
                     "schedules": current_data["schedules"]
                 })
 
@@ -336,10 +348,14 @@ async def ws_handler(websocket):
             elif c_type == "power":
                 send_power_relay(int(data.get("channel")), int(data.get("state")))
 
+            elif c_type == "system_shutdown":
+                os.system("sudo shutdown -h now")
+
     except Exception as e:
-        print(f"[WS ERROR] {e}")
+        print(f"[WS ERROR] {e}", flush=True)
     finally:
         connected_clients.discard(websocket)
+        print(f"[WS 종료] 클라이언트 연결 해제. 남은 연결 수: {len(connected_clients)}", flush=True)
 
 # ==============================================================================
 # 6. 정적 웹 서버 및 메인 진입점
@@ -352,7 +368,6 @@ def run_http_server():
         def log_message(self, format, *args):
             pass
 
-    # TIME_WAIT 포트 충돌 방지
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", CONFIG["HTTP_PORT"]), QuietHandler) as httpd:
         httpd.serve_forever()
@@ -364,11 +379,10 @@ async def main():
     if hasattr(active_driver, "start"):
         await active_driver.start(CONFIG["AUDIO_IP"])
 
-        # [추가] 스케줄러 백그라운드 루프 기동
     asyncio.create_task(scheduler_loop())
 
     async with websockets.serve(ws_handler, "0.0.0.0", CONFIG["WS_PORT"]):
-        print(f"=== Unified Master Controller Ready: http://localhost:{CONFIG['HTTP_PORT']}/index.html ===")
+        print(f"=== Unified Master Controller Ready: http://localhost:{CONFIG['HTTP_PORT']}/index.html ===", flush=True)
         await asyncio.Future()
 
 if __name__ == "__main__":

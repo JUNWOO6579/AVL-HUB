@@ -18,6 +18,8 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 body {
@@ -34,7 +36,39 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Nanum Gothic", sans-serif;
     color: var(--text-main);
     display: flex;
-    user-select: none;
+}
+
+/* 폼 공통 스타일 (누락 복구) */
+.form-group {
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-group input, 
+.form-group select {
+    width: 100%;
+    height: 38px;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.form-group input:focus, 
+.form-group select:focus {
+    border-color: var(--accent);
 }
 
 /* 1. 좌측 컴팩트 사이드바 */
@@ -56,17 +90,14 @@ body {
     padding: 6px 10px 18px 10px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 12px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
 }
+.sidebar-header:hover { opacity: 0.8; }
+.sidebar-header:active { transform: scale(0.98); }
 
-.sidebar-header img {
-    height: 24px;
-}
-
-.sidebar-title {
-    font-size: 14px;
-    font-weight: bold;
-    letter-spacing: -0.3px;
-}
+.sidebar-header img { height: 24px; }
+.sidebar-title { font-size: 14px; font-weight: bold; letter-spacing: -0.3px; }
 
 .nav-menu {
     display: flex;
@@ -100,14 +131,25 @@ body {
     font-weight: bold;
 }
 
-/* 2. 메인 컨텐츠 영역 (화면 전체 꽉 차게) */
+/* 2. 메인 컨텐츠 영역 */
 .main-view {
     flex: 1;
     height: 100vh;
-    padding: 20px 24px;
+    padding: 24px 30px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+}
+
+.view-section {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+}
+
+.view-section.active {
+    display: flex !important;
 }
 
 .view-header {
@@ -116,7 +158,7 @@ body {
     align-items: center;
     border-bottom: 1px solid var(--border);
     padding-bottom: 14px;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
     flex-shrink: 0;
 }
 
@@ -126,37 +168,96 @@ body {
     letter-spacing: -0.5px;
 }
 
-.view-section {
-    display: none;
-    flex-direction: column;
-    flex: 1;
+/* 3. 스트림덱 2x3 에디터 매퍼 (panel.html과 1:1 완벽 일치) */
+.deck-mapping-canvas {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 24px !important;
+    background: #0d1117 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 14px !important;
+    box-sizing: border-box !important;
 }
 
-.view-section.active {
-    display: flex;
+#deck-editor-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: repeat(2, 110px) !important;
+    gap: 14px !important;
+    width: 100% !important;
+    max-width: 620px !important;
+    margin: 0 auto !important;
 }
 
-/* 3. 공용 버튼 & 컨트롤 */
+.editor-slot {
+    background: radial-gradient(circle at 50% 25%, #222734 0%, #12151b 100%) !important;
+    border: 2px solid #30363d !important;
+    border-radius: 14px !important;
+    color: #c9d1d9 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: transform 0.12s ease, border-color 0.12s ease !important;
+    user-select: none !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    padding: 8px !important;
+    text-align: center !important;
+}
+
+.editor-slot:hover {
+    border-color: #58a6ff !important;
+    transform: translateY(-2px) !important;
+}
+
+.editor-slot.selected {
+    border-color: #0078d4 !important;
+    background: radial-gradient(circle at 50% 30%, #19385c 0%, #0c1829 100%) !important;
+    box-shadow: 0 0 16px rgba(0, 120, 212, 0.7) !important;
+}
+
+.editor-slot .slot-icon {
+    font-size: 26px !important;
+    margin-bottom: 4px !important;
+    pointer-events: none !important;
+}
+
+.editor-slot .slot-title {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    pointer-events: none !important;
+    color: #ffffff !important;
+    word-break: keep-all !important;
+    line-height: 1.2 !important;
+}
+
+/* 4. 공용 버튼 & 컨트롤 */
 .fluent-btn {
     background: #252a34;
     border: 1px solid var(--border-strong);
     color: var(--text-main);
-    padding: 8px 14px;
+    padding: 8px 16px;
     border-radius: 6px;
     font-size: 13px;
     font-weight: bold;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, border-color 0.15s;
 }
 .fluent-btn:hover { background: #323846; }
-.fluent-btn.primary {
+.fluent-btn.primary, .fluent-btn.active {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
 }
-.fluent-btn.primary:hover { background: #1084d9; }
+.fluent-btn.primary:hover, .fluent-btn.active:hover { background: #1084d9; }
 
-/* 4. 씬 매크로 카드 그리드 */
+/* 5. 씬 매크로 카드 그리드 */
 .macro-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -217,7 +318,7 @@ body {
 }
 .add-card:hover { border-color: var(--accent); color: var(--accent); }
 
-/* 5. 음향 콘솔 랙 (12채널 정상 복구 핵심) */
+/* 6. 음향 콘솔 랙 */
 .bank-tabs {
     display: flex;
     gap: 6px;
@@ -302,41 +403,7 @@ body {
     cursor: pointer;
 }
 
-/* 6. 스트림덱 & 설정 그리드 */
-.deck-slot-box {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.deck-slot-title { font-size: 12px; font-weight: bold; color: #00d2ff; }
-
-.setting-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-    max-width: 800px;
-}
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 12px;
-}
-.form-group label { font-size: 12px; color: var(--text-muted); }
-.form-group input, .form-group select {
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    color: #fff;
-    padding: 8px 10px;
-    border-radius: 4px;
-    font-size: 13px;
-}
-
-/* 7. [핵심] 팝업 모달 정상화 (화면 밖 침범 원천 차단) */
+/* 7. 팝업 모달 */
 .modal {
     display: none;
     position: fixed;
@@ -350,7 +417,7 @@ body {
     align-items: center;
     justify-content: center;
 }
-.modal.open {
+.modal.open, .modal.active {
     display: flex !important;
 }
 .modal-content {
@@ -361,7 +428,7 @@ body {
     box-shadow: 0 20px 60px rgba(0,0,0,0.8);
 }
 
-/* 로그인 전체 화면 오버레이 */
+/* 8. 로그인 오버레이 */
 .login-container {
     position: fixed;
     top: 0;
@@ -394,7 +461,7 @@ body {
     font-size: 18px;
     font-weight: bold;
     text-align: center;
-    margin-bottom: 4px;
+    margin-bottom: 20px;
     color: #fff;
 }
 
@@ -409,17 +476,7 @@ body {
     display: none;
     font-size: 12px;
     color: var(--accent-red);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     text-align: center;
     font-weight: 500;
-}
-
-.sidebar-header {
-    transition: opacity 0.15s ease;
-}
-.sidebar-header:hover {
-    opacity: 0.8;
-}
-.sidebar-header:active {
-    transform: scale(0.98);
 }

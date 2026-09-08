@@ -2,21 +2,31 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Master Hub & Production Control</title>
     <link rel="icon" type="image/png" href="logo.png">
     <link rel="stylesheet" href="style.css">
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
 
-    <!-- 0. 시스템 보안 로그인 화면 (로그인 전 전체 차단) -->
+    <!-- 스트림덱 전용 뷰 컨테이너 (풀스크린용) -->
+    <div id="streamdeck-view" class="view-panel" data-view="streamdeck">
+        <div class="deck-grid" id="deck-grid"></div>
+    </div>
+
+    <!-- 0. 시스템 보안 로그인 화면 -->
     <div id="login-overlay" class="login-container">
         <div class="login-card">
             <div style="display: flex; justify-content: center; margin-bottom: 16px;">
                 <img src="logo.png" alt="Logo" style="height: 48px;" onerror="this.style.display='none'">
             </div>
             <div class="login-title">통합 방송제어 시스템</div>
-        
 
             <form onsubmit="handleLogin(event)">
                 <div class="form-group" style="margin-bottom: 12px;">
@@ -46,12 +56,12 @@
             <div class="nav-item" data-view="switcher" onclick="switchView('switcher')">비디오 스위처 메뉴</div>
             <div class="nav-item" data-view="power" onclick="switchView('power')">순차전원분배기 메뉴</div>
             <div class="nav-item" data-view="scheduler" onclick="switchView('scheduler')">스케줄러 동기화</div>
-            <div class="nav-item" data-view="deck" onclick="switchView('deck')">스트림덱 배치 메뉴</div>
+            <div class="nav-item" data-view="deck" onclick="switchView('deck')">터치 패널 UI 설정</div>
             <div class="nav-item" data-view="settings" onclick="switchView('settings')" style="margin-top: auto;">⚙ 설정</div>
         </div>
         <div class="nav-item" onclick="handleLogout()" style="color: var(--accent-red); border-top: 1px solid var(--border); margin-top: 8px; padding-top: 12px; cursor: pointer;">
-                    로그아웃
-                </div>
+            로그아웃
+        </div>
     </div>
 
     <!-- 우측 메인 작업 영역 -->
@@ -140,67 +150,84 @@
             </div>
         </div>
 
-        <!-- 6. 스트림덱 배치 & 페이지 매핑 -->
+        <!-- 6. 터치 패널 UI 설정 (단일 통합 & 중앙 정렬) -->
         <div id="view-deck" class="view-section">
             <div class="view-header">
-                <div class="view-title">스트림덱 미니 (6키) 물리 배치 & 페이지 프리뷰</div>
-                <button class="fluent-btn primary" onclick="saveDeckLayout()">기기에 즉시 적용 및 저장</button>
+                <div>
+                    <div class="view-title">터치 패널 UI 설정</div>
+                    <div style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">슬롯을 클릭하여 라벨과 매크로를 설정하세요. (6번은 다음 페이지 전환 버튼)</div>
+                </div>
+                <button class="fluent-btn primary" onclick="saveDeckLayoutToServer()" style="padding: 8px 18px; font-weight: bold;">
+                    💾 패널에 즉시 적용
+                </button>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px;">
-                <div id="deck-slot-0" class="deck-slot-box"></div>
-                <div id="deck-slot-1" class="deck-slot-box"></div>
-                <div id="deck-slot-2" class="deck-slot-box"></div>
-                <div id="deck-slot-3" class="deck-slot-box"></div>
-                <div id="deck-slot-4" class="deck-slot-box"></div>
-                <div id="deck-slot-5" class="deck-slot-box"></div>
+            <!-- 페이지 전환 & 관리 바 -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 0 auto 16px auto; width: 100%; max-width: 680px; background: var(--bg-surface); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="fluent-btn" type="button" onclick="changeDeckPreviewPage(-1)">◀ 이전 페이지</button>
+                    <span id="deck-preview-page-indicator" style="font-weight: bold; font-size: 14px; color: var(--accent);">Page 1 / 1</span>
+                    <button class="fluent-btn" type="button" onclick="changeDeckPreviewPage(1)">다음 페이지 ▶</button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="fluent-btn" type="button" onclick="addNewDeckPage()" style="border-color: var(--accent-green); color: var(--accent-green);">+ 새 페이지 추가</button>
+                    <button class="fluent-btn" type="button" onclick="deleteCurrentDeckPage()" style="border-color: var(--accent-red); color: var(--accent-red);">- 현재 페이지 삭제</button>
+                </div>
             </div>
 
-            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <span style="font-size: 13px; font-weight: bold; color: var(--accent-orange);">이전 / 다음 페이지 매핑 미리보기</span>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <button class="fluent-btn" style="padding: 3px 10px;" onclick="changeDeckPreviewPage(-1)">◀</button>
-                        <span id="deck-preview-page-indicator" style="font-size: 12px; font-weight: bold;">Page 1 / 1</span>
-                        <button class="fluent-btn" style="padding: 3px 10px;" onclick="changeDeckPreviewPage(1)">▶</button>
+            <!-- 2x3 시각적 프리뷰 캔버스 -->
+            <div class="deck-mapping-canvas">
+                <div id="deck-editor-grid"></div>
+            </div>
+
+            <!-- 선택 슬롯 설정 패널 -->
+            <div id="slot-config-panel" style="width: 100%; max-width: 680px; margin: 20px auto 0 auto; padding: 20px; background: #161b22; border-radius: 12px; border: 1px solid #30363d; display: none; box-sizing: border-box;">
+                <h3 id="selected-slot-title" style="margin-top: 0; font-size: 15px; color: #58a6ff; margin-bottom: 12px;">슬롯 설정</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 14px; align-items: end;">
+                    <div>
+                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">표시 라벨 (Title)</label>
+                        <input type="text" id="slot-input-title" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: white;" oninput="updateSlotPreview()">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">아이콘 (Emoji / Text)</label>
+                        <input type="text" id="slot-input-icon" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: white;" oninput="updateSlotPreview()">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #8b949e; display: block; margin-bottom: 6px;">실행할 씬 매크로</label>
+                        <select id="slot-input-action" style="width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: white;" onchange="updateSlotPreview()"></select>
                     </div>
                 </div>
-                <div id="deck-live-preview-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
-            </div>
-
-            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px;">
-                <div style="font-size: 13px; font-weight: bold; color: #a5d6ff; margin-bottom: 8px;">매크로 순서 재정렬 (▲/▼ 버튼으로 페이지 위치 변경)</div>
-                <div id="deck-macro-order-list" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
             </div>
         </div>
 
+        <!-- 7. 자동화 이벤트 스케줄러 -->
         <div id="view-scheduler" class="view-section">
-                <div class="view-header">
-                    <div>
-                        <div class="view-title">자동화 이벤트 스케줄러</div>
-                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">지정된 요일과 시각에 등록된 씬 매크로를 자동으로 트리거합니다.</div>
-                    </div>
-                    <button class="fluent-btn primary" onclick="openNewScheduleModal()">+ 새 스케줄 등록</button>
+            <div class="view-header">
+                <div>
+                    <div class="view-title">자동화 이벤트 스케줄러</div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">지정된 요일과 시각에 등록된 씬 매크로를 자동으로 트리거합니다.</div>
                 </div>
-
-                <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
-                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
-                        <thead>
-                            <tr style="background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border); color: var(--text-muted);">
-                                <th style="padding: 12px 16px;">상태</th>
-                                <th style="padding: 12px 16px;">스케줄 명칭</th>
-                                <th style="padding: 12px 16px;">실행 요일</th>
-                                <th style="padding: 12px 16px;">실행 시각</th>
-                                <th style="padding: 12px 16px;">연동 씬 매크로</th>
-                                <th style="padding: 12px 16px; text-align: right;">관리</th>
-                            </tr>
-                        </thead>
-                        <tbody id="schedule-list-body"></tbody>
-                    </table>
-                </div>
+                <button class="fluent-btn primary" onclick="openNewScheduleModal()">+ 새 스케줄 등록</button>
             </div>
 
-        <!-- 7. 하드웨어 설정 -->
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                    <thead>
+                        <tr style="background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                            <th style="padding: 12px 16px;">상태</th>
+                            <th style="padding: 12px 16px;">스케줄 명칭</th>
+                            <th style="padding: 12px 16px;">실행 요일</th>
+                            <th style="padding: 12px 16px;">실행 시각</th>
+                            <th style="padding: 12px 16px;">연동 씬 매크로</th>
+                            <th style="padding: 12px 16px; text-align: right;">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 8. 하드웨어 설정 -->
         <div id="view-settings" class="view-section">
             <div class="view-header">
                 <div class="view-title">하드웨어 연결 & 통신 설정</div>
@@ -242,7 +269,7 @@
         </div>
     </div>
 
-    <!-- 매크로 편집 전용 모달 (화면 밖 팝업 격리 완료) -->
+    <!-- 매크로 편집 전용 모달 -->
     <div id="modal-macro-edit" class="modal">
         <div class="modal-content" style="width: 480px; max-width: 90vw;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
@@ -292,18 +319,19 @@
         </div>
     </div>
 
-<!-- 동기화 로딩 오버레이 모달 -->
-<div id="modal-sync-loading" class="modal" style="background: rgba(0, 0, 0, 0.85); z-index: 1000000;">
-    <div class="modal-content" style="width: 320px; text-align: center; padding: 30px 20px;">
-        <div style="font-size: 28px; margin-bottom: 12px; animation: spin 1.5s linear infinite;">⏳</div>
-        <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">콘솔 동기화 중</div>
-        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-            하드웨어 채널 및 스냅샷 데이터를<br>불러오는 중입니다. 잠시만 기다려주세요.
+    <!-- 동기화 로딩 모달 -->
+    <div id="modal-sync-loading" class="modal" style="background: rgba(0, 0, 0, 0.85); z-index: 1000000;">
+        <div class="modal-content" style="width: 320px; text-align: center; padding: 30px 20px;">
+            <div style="font-size: 28px; margin-bottom: 12px; animation: spin 1.5s linear infinite;">⏳</div>
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">콘솔 동기화 중</div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+                하드웨어 채널 및 스냅샷 데이터를<br>불러오는 중입니다. 잠시만 기다려주세요.
+            </div>
         </div>
     </div>
-</div>
 
-<div id="modal-schedule-edit" class="modal">
+    <!-- 스케줄 모달 -->
+    <div id="modal-schedule-edit" class="modal">
         <div class="modal-content" style="width: 420px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3 id="sched-modal-title" style="font-size: 16px;">자동화 스케줄 등록</h3>
@@ -336,13 +364,6 @@
             <button class="fluent-btn primary" style="width: 100%; height: 42px; margin-top: 10px;" onclick="saveScheduleItem()">스케줄 저장</button>
         </div>
     </div>
-
-<style>
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-</style>
 
     <script src="app.js"></script>
 </body>

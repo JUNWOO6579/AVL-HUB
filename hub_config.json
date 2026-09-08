@@ -8,10 +8,8 @@
       "unmutes": [
         "ch/1"
       ],
-      "mutes": [],
       "ptz_cam": 1,
-      "ptz": 1,
-      "switcher": 1
+      "ptz": 1
     },
     {
       "name": "설교 / 발언",
@@ -43,9 +41,8 @@
       "switcher": 1
     },
     {
-      "name": "새벽예배",
+      "name": "성찬 / 기도",
       "desc": "차분한 조명 / BGM 채널만 오픈",
-      "power": null,
       "snap": 1,
       "unmutes": [
         "ch/5"
@@ -54,8 +51,7 @@
         "ch/1"
       ],
       "ptz_cam": 1,
-      "ptz": 4,
-      "switcher": null
+      "ptz": 4
     },
     {
       "name": "영상 상영",
@@ -78,35 +74,87 @@
       ]
     }
   ],
-  "deck_layout": [
-    {
-      "type": "macro"
-    },
-    {
-      "type": "macro"
-    },
-    {
-      "type": "prev"
-    },
-    {
-      "type": "macro"
-    },
-    {
-      "type": "macro"
-    },
-    {
-      "type": "next"
-    }
+  "deck_pages": [
+    [
+      {
+        "title": "123456",
+        "icon": "⚡",
+        "macro_idx": 0
+      },
+      {
+        "title": "설교/발언",
+        "icon": "🎙️",
+        "macro_idx": 1
+      },
+      {
+        "title": "찬양/밴드",
+        "icon": "🎸",
+        "macro_idx": 2
+      },
+      {
+        "title": "262626",
+        "icon": "🕯️",
+        "macro_idx": 3
+      },
+      {
+        "title": "영상 상영",
+        "icon": "🎬",
+        "macro_idx": 4
+      }
+    ],
+    [
+      {
+        "title": "P2 기능 1",
+        "icon": "⚡",
+        "macro_idx": -1
+      },
+      {
+        "title": "P2 기능 2",
+        "icon": "⚡",
+        "macro_idx": -1
+      },
+      {
+        "title": "P2 기능 3",
+        "icon": "⚡",
+        "macro_idx": -1
+      },
+      {
+        "title": "P2 기능 4",
+        "icon": "⚡",
+        "macro_idx": -1
+      }
+    ]
   ],
   "schedules": [
     {
-      "name": "주일 1부 예배",
-      "time": "09:00",
+      "name": "매일 아침 9시",
+      "enabled": true,
       "days": [
-        0
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
       ],
-      "macro_idx": 0,
-      "enabled": true
+      "time": "09:00",
+      "macro_idx": 0
+    },
+    {
+      "name": "매일 저녁 6시",
+      "enabled": true,
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "time": "18:00",
+      "macro_idx": 5
     }
   ]
 }

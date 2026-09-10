@@ -24,56 +24,59 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
         }
 
-        /* 3열 2행 (2x3 = 6개) 꽉 채움 그리드 */
+        /* 3열 2행 그리드 여백 최적화 */
         #deck-grid {
             display: grid !important;
             grid-template-columns: repeat(3, 1fr) !important;
             grid-template-rows: repeat(2, 1fr) !important;
-            gap: 14px !important;
+            gap: 16px !important;
             width: 100vw !important;
             height: 100vh !important;
-            padding: 14px !important;
+            padding: 16px !important;
         }
 
-        /* 스트림덱 기본 버튼 스타일 (누락되었던 핵심) */
+        /* 버튼 폰트 및 패딩 확대 */
         .deck-key {
             width: 100% !important;
             height: 100% !important;
             margin: 0 !important;
             background: #161b22 !important;
             border: 2px solid #30363d !important;
-            border-radius: 14px !important;
+            border-radius: 18px !important;
             color: #f0f6fc !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
             align-items: center !important;
             text-align: center !important;
-            padding: 8px !important;
-            font-size: 14px !important;
-            font-weight: 600 !important;
+            padding: 12px !important;
+            font-size: 22px !important;       /* 14px -> 22px 로 대폭 확대 */
+            font-weight: 700 !important;
             transition: transform 0.08s ease, background 0.08s ease, border-color 0.08s ease !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
         }
 
         /* 터치/클릭 활성화 피드백 */
         .deck-key:active, .deck-key.active {
             background: #1f6feb !important;
             border-color: #58a6ff !important;
-            transform: scale(0.96) !important;
-            box-shadow: 0 0 16px rgba(31, 111, 235, 0.6) !important;
+            transform: scale(0.95) !important;
+            box-shadow: 0 0 20px rgba(31, 111, 235, 0.7) !important;
         }
 
+        /* 이모지 / 아이콘 크기 확대 */
         .key-icon { 
-            font-size: 28px !important; 
-            margin-bottom: 6px !important; 
+            font-size: 48px !important;       /* 28px -> 48px 로 대폭 확대 */
+            margin-bottom: 10px !important; 
             pointer-events: none !important; 
         }
 
+        /* 버튼 타이틀 가독성 강화 */
         .key-title { 
             pointer-events: none !important; 
             word-break: keep-all !important; 
-            line-height: 1.2 !important;
+            line-height: 1.25 !important;
+            letter-spacing: -0.5px !important;
         }
     </style>
 </head>

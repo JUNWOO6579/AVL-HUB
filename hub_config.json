@@ -77,28 +77,28 @@
   "deck_pages": [
     [
       {
-        "title": "123456",
-        "icon": "⚡",
+        "title": "전체 on",
+        "icon": "미디어시스템 ON",
         "macro_idx": 0
       },
       {
-        "title": "설교/발언",
-        "icon": "🎙️",
+        "title": "카메라 1, 음향 프리셋",
+        "icon": "유치1부",
         "macro_idx": 1
       },
       {
-        "title": "찬양/밴드",
-        "icon": "🎸",
+        "title": "카메라 1, 음향 프리셋",
+        "icon": "유치2부",
         "macro_idx": 2
       },
       {
-        "title": "262626",
-        "icon": "🕯️",
+        "title": "OBS 녹화",
+        "icon": "실황 녹화",
         "macro_idx": 3
       },
       {
-        "title": "영상 상영",
-        "icon": "🎬",
+        "title": "음향 REVERB",
+        "icon": "리버브 On/Off",
         "macro_idx": 4
       }
     ],

@@ -40,14 +40,20 @@ async def scheduler_loop():
 
         await asyncio.sleep(1)
 
-# 모듈화된 콘솔 팩토리 및 PTZ 컨트롤러
+# 모듈화된 콘솔 팩토리, PTZ 컨트롤러 및 비디오 스위처 드라이버
 from consoles import create_console_driver
 from ptz import PTZController
+from video_switcher import create_switcher_driver, SUPPORTED_SWITCHERS
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MACRO_FILE = os.path.join(BASE_DIR, "hub_config.json")
 
 DEFAULT_DATA = {
+    "switcher": {
+        "model": "atem_mini",
+        "ip": "192.168.219.10",
+        "enabled": True
+    },
     "macros": [
         {"name": "전체 순차 켜기", "desc": "순차전원 ALL ON / 믹서 준비", "power": 1, "snap": 1, "unmutes": ["ch/1"], "ptz_cam": 1, "ptz": 1},
         {"name": "설교 / 발언", "desc": "강단 마이크 오픈 / 타이트 샷", "snap": 2, "unmutes": ["ch/1"], "mutes": ["ch/2", "ch/3"], "ptz_cam": 1, "ptz": 2, "switcher": 2},
@@ -100,8 +106,9 @@ CONFIG = {
     "AUDIO_IP": "192.168.219.106",
     "AUDIO_PORT": 2223,
 
-    "SWITCHER_IP": "192.168.219.110",
-    "SWITCHER_PORT": 9910,
+    "SWITCHER_MODEL": "atem_mini",
+    "SWITCHER_IP": "192.168.219.10",
+
     "LIGHT_IP": "192.168.219.120",
     "LIGHT_PORT": 8000,
 
@@ -122,9 +129,10 @@ CONFIG = {
 }
 
 # ==============================================================================
-# 2. 콘솔 드라이버 팩토리 및 상태 브로드캐스트
+# 2. 드라이버 인스턴스 및 상태 브로드캐스트
 # ==============================================================================
 active_driver = None
+active_switcher = None
 connected_clients = set()
 aux_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 ptz_ctrl = PTZController(CONFIG["PTZ_MODE"], CONFIG["PTZ_SERIAL_PORT"], CONFIG["PTZ_BAUDRATE"])
@@ -164,15 +172,37 @@ def init_audio_driver(console_type: str, ip: str, port: int = None):
     active_driver.bind_broadcast(sync_broadcast)
     print(f"[*] 오디오 드라이버 준비 완료: {console_type} ({ip}:{CONFIG['AUDIO_PORT']})", flush=True)
 
+def init_switcher_driver(model: str, ip: str):
+    global active_switcher
+    if active_switcher:
+        try:
+            active_switcher.disconnect()
+        except Exception:
+            pass
+    try:
+        active_switcher = create_switcher_driver(model)
+        connected = active_switcher.connect(ip)
+        CONFIG["SWITCHER_MODEL"] = model
+        CONFIG["SWITCHER_IP"] = ip
+        print(f"[*] 비디오 스위처 연결: {model} ({ip}) -> 연결상태: {connected}", flush=True)
+        return connected
+    except Exception as e:
+        print(f"[SWITCHER INIT ERR] {e}", flush=True)
+        return False
+
 # ==============================================================================
 # 3. 비디오 스위처, 조명, 전원 제어
 # ==============================================================================
 def send_switcher_cut(channel: int):
-    cmd = f"CUT {channel}\r\n".encode("ascii")
-    try:
-        aux_sock.sendto(cmd, (CONFIG["SWITCHER_IP"], CONFIG["SWITCHER_PORT"]))
-    except Exception as e:
-        print(f"[SWITCHER ERR] {e}", flush=True)
+    global active_switcher
+    if not active_switcher or not active_switcher.is_connected():
+        init_switcher_driver(CONFIG["SWITCHER_MODEL"], CONFIG["SWITCHER_IP"])
+
+    if active_switcher and active_switcher.is_connected():
+        success = active_switcher.set_program(channel)
+        print(f"[SWITCHER] CAM {channel}번 CUT 전환 완료 (성공: {success})", flush=True)
+    else:
+        print(f"[SWITCHER ERR] 스위처 통신 불가 (IP: {CONFIG['SWITCHER_IP']})", flush=True)
 
 def send_lighting_cue(cue_num: float):
     cue_str = f"Goto Cue {cue_num}"
@@ -221,7 +251,7 @@ async def execute_macro_step(macro_data: dict):
         ptz_ctrl.send_preset(int(ptz_cam), int(ptz_preset), CONFIG["PTZ_CAMERAS"])
 
     if switcher is not None:
-        send_switcher_cut(switcher)
+        send_switcher_cut(int(switcher))
 
     if lighting is not None:
         send_lighting_cue(lighting)
@@ -235,9 +265,11 @@ async def ws_handler(websocket):
     connected_clients.add(websocket)
     print(f"[WS 접속] 클라이언트 연결됨. 현재 총 접속 수: {len(connected_clients)}", flush=True)
     try:
+        conf_payload = dict(CONFIG)
+        conf_payload["SWITCHER_CONNECTED"] = active_switcher.is_connected() if active_switcher else False
         await websocket.send(json.dumps({
             "type": "sys_config",
-            "config": CONFIG
+            "config": conf_payload
         }))
 
         hub_data = load_hub_data()
@@ -245,7 +277,9 @@ async def ws_handler(websocket):
             "type": "hub_sync",
             "macros": hub_data.get("macros", []),
             "deck_pages": hub_data.get("deck_pages", DEFAULT_DATA["deck_pages"]),
-            "schedules": hub_data.get("schedules", [])
+            "schedules": hub_data.get("schedules", []),
+            "switcher": hub_data.get("switcher", DEFAULT_DATA["switcher"]),
+            "switcher_catalog": SUPPORTED_SWITCHERS
         }))
 
         if active_driver and hasattr(active_driver, "load_metadata"):
@@ -254,7 +288,6 @@ async def ws_handler(websocket):
         await websocket.send(json.dumps({"type": "sync_complete"}))
 
         async for msg in websocket:
-            # 수신 패킷을 즉시 터미널에 로깅
             print(f"[WS 수신 Raw] {msg[:100]}...", flush=True)
             data = json.loads(msg)
             c_type = data.get("type")
@@ -263,14 +296,22 @@ async def ws_handler(websocket):
                 new_conf = data.get("config", {})
                 CONFIG.update(new_conf)
 
+                # 오디오 드라이버 재설정
                 p_val = CONFIG.get("AUDIO_PORT")
                 port = int(p_val) if p_val else None
                 init_audio_driver(CONFIG["AUDIO_TYPE"], CONFIG["AUDIO_IP"], port)
                 if hasattr(active_driver, "start"):
                     await active_driver.start(CONFIG["AUDIO_IP"])
 
+                # 비디오 스위처 재연결
+                init_switcher_driver(CONFIG.get("SWITCHER_MODEL", "atem_mini"), CONFIG.get("SWITCHER_IP", "192.168.219.10"))
+
                 ptz_ctrl.update_config(CONFIG["PTZ_MODE"], CONFIG["PTZ_SERIAL_PORT"], CONFIG["PTZ_BAUDRATE"])
-                await broadcast({"type": "sys_config", "config": CONFIG})
+                
+                # 최신 스위처 연결 상태 반영하여 브로드캐스트
+                conf_to_send = dict(CONFIG)
+                conf_to_send["SWITCHER_CONNECTED"] = active_switcher.is_connected() if active_switcher else False
+                await broadcast({"type": "sys_config", "config": conf_to_send})
 
                 if active_driver and hasattr(active_driver, "load_metadata"):
                     await active_driver.load_metadata()
@@ -287,15 +328,19 @@ async def ws_handler(websocket):
             elif c_type == "master_macro":
                 asyncio.create_task(execute_macro_step(data.get("macro")))
 
-            # 다중 페이지 저장 및 브로드캐스트
             elif c_type in ("update_hub_data", "update_macros"):
                 current_data = load_hub_data()
                 new_macros = data.get("macros", current_data.get("macros", []))
                 new_pages = data.get("deck_pages", current_data.get("deck_pages", DEFAULT_DATA["deck_pages"]))
+                new_switcher = data.get("switcher", current_data.get("switcher", DEFAULT_DATA["switcher"]))
 
-                print(f"[서버] update_hub_data 수신: {len(new_pages)}개 페이지 저장 진행", flush=True)
+                print(f"[서버] update_hub_data 수신: 스위처 {new_switcher.get('model')} ({new_switcher.get('ip')})", flush=True)
+
+                if new_switcher.get("model") != CONFIG.get("SWITCHER_MODEL") or new_switcher.get("ip") != CONFIG.get("SWITCHER_IP"):
+                    init_switcher_driver(new_switcher.get("model", "atem_mini"), new_switcher.get("ip", "192.168.219.10"))
 
                 save_hub_data({
+                    "switcher": new_switcher,
                     "macros": new_macros,
                     "deck_pages": new_pages,
                     "schedules": current_data.get("schedules", [])
@@ -303,11 +348,12 @@ async def ws_handler(websocket):
 
                 await broadcast({
                     "type": "hub_sync",
+                    "switcher": new_switcher,
+                    "switcher_catalog": SUPPORTED_SWITCHERS,
                     "macros": new_macros,
                     "deck_pages": new_pages,
                     "schedules": current_data.get("schedules", [])
                 })
-                print(f"[서버] 전체 클라이언트로 hub_sync 브로드캐스트 완료", flush=True)
 
             elif c_type == "update_schedules":
                 current_data = load_hub_data()
@@ -315,6 +361,8 @@ async def ws_handler(websocket):
                 save_hub_data(current_data)
                 await broadcast({
                     "type": "hub_sync",
+                    "switcher": current_data.get("switcher", DEFAULT_DATA["switcher"]),
+                    "switcher_catalog": SUPPORTED_SWITCHERS,
                     "macros": current_data.get("macros", []),
                     "deck_pages": current_data.get("deck_pages", DEFAULT_DATA["deck_pages"]),
                     "schedules": current_data["schedules"]
@@ -340,7 +388,8 @@ async def ws_handler(websocket):
                 ptz_ctrl.send_preset(cam, preset, CONFIG["PTZ_CAMERAS"])
 
             elif c_type == "switcher":
-                send_switcher_cut(int(data.get("channel")))
+                ch = int(data.get("channel", 1))
+                send_switcher_cut(ch)
 
             elif c_type == "lighting":
                 send_lighting_cue(float(data.get("cue")))
@@ -379,6 +428,12 @@ async def main():
     if hasattr(active_driver, "start"):
         await active_driver.start(CONFIG["AUDIO_IP"])
 
+    hub_data = load_hub_data()
+    sw_conf = hub_data.get("switcher", {})
+    sw_model = sw_conf.get("model", CONFIG["SWITCHER_MODEL"])
+    sw_ip = sw_conf.get("ip", CONFIG["SWITCHER_IP"])
+    init_switcher_driver(sw_model, sw_ip)
+
     asyncio.create_task(scheduler_loop())
 
     async with websockets.serve(ws_handler, "0.0.0.0", CONFIG["WS_PORT"]):
@@ -391,4 +446,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if active_driver and hasattr(active_driver, "stop"):
             active_driver.stop()
+        if active_switcher and hasattr(active_switcher, "disconnect"):
+            active_switcher.disconnect()
         ptz_ctrl.close()

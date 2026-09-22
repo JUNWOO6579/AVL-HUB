@@ -8,6 +8,11 @@ let editMacroIndex = null;
 let schedules = [];
 let editScheduleIdx = null;
 
+// 비디오 스위처 전역 상태
+let switcherCatalog = {};
+let currentSwitcherConf = { model: "atem_mini", ip: "192.168.219.10" };
+let currentActiveSwitcherChannel = 1;
+
 const defaultMacros = [
     { name: "전체 순차 켜기", desc: "순차전원 ALL ON / 믹서 준비", power: 1, snap: 1, unmutes: ["ch/1"], ptz_cam: 1, ptz: 1 },
     { name: "설교 / 발언", desc: "강단 마이크 오픈 / 타이트 샷", snap: 2, unmutes: ["ch/1"], mutes: ["ch/2","ch/3"], ptz_cam: 1, ptz: 2, switcher: 2 },
@@ -129,6 +134,7 @@ function switchView(viewName) {
     if (viewName === 'scheduler') renderSchedules();
     if (viewName === 'audio') { renderBankTabs(); renderFaders(); }
     if (viewName === 'ptz') { renderPTZCamTabs(); renderPTZPresets(); }
+    if (viewName === 'switcher') renderSwitcherChannels();
     if (viewName === 'deck') renderDeckEditor();
 }
 
@@ -176,6 +182,11 @@ function runMacro(idx) {
         const cam = targetMacro.ptz_cam || 1;
         activePTZPresetMap[cam] = targetMacro.ptz;
         if (activePTZCam === cam) renderPTZPresets();
+    }
+
+    if (targetMacro.switcher) {
+        currentActiveSwitcherChannel = targetMacro.switcher;
+        highlightActiveSwitcherButton(currentActiveSwitcherChannel);
     }
 }
 
@@ -256,7 +267,8 @@ function syncHubData() {
         ws.send(JSON.stringify({
             type: "update_hub_data",
             macros: macros,
-            deck_pages: deckPages
+            deck_pages: deckPages,
+            switcher: currentSwitcherConf
         }));
     }
 }
@@ -476,7 +488,7 @@ function toggleMuteVal(target, btn) {
 }
 
 // =====================================================================
-// 6. 스트림덱 2x3 미니 표준 페이징 에디터 (완성형)
+// 6. 스트림덱 2x3 미니 표준 페이징 에디터
 // =====================================================================
 function changeDeckPreviewPage(delta) {
     const totalPages = Math.max(1, deckPages.length);
@@ -496,12 +508,9 @@ function renderDeckEditor() {
     if (currentEditorPage >= totalPages) currentEditorPage = totalPages - 1;
     if (currentEditorPage < 0) currentEditorPage = 0;
 
-    // 상단 인디케이터 즉시 갱신
     const pageText = `Page ${currentEditorPage + 1} / ${totalPages}`;
     const ind1 = document.getElementById("deck-preview-page-indicator");
-    const ind2 = document.getElementById("editor-page-indicator");
     if (ind1) ind1.textContent = pageText;
-    if (ind2) ind2.textContent = pageText;
 
     const currentItems = deckPages[currentEditorPage] || [];
     let itemIdx = 0;
@@ -510,21 +519,15 @@ function renderDeckEditor() {
         const slotEl = document.createElement("div");
         slotEl.className = "editor-slot";
 
-        // 표준 내비게이션 키 분기
         if (totalPages > 1 && currentEditorPage === 0 && slot === 5) {
-            // 1페이지 우측 하단 (슬롯 5) -> 다음 페이지
             setNavSlot(slotEl, "다음 페이지 ▶", "➡", (e) => { e.stopPropagation(); changeDeckPreviewPage(1); });
         } else if (totalPages > 1 && currentEditorPage > 0 && slot === 2) {
-            // 2페이지 이후 우측 상단 (슬롯 2) -> 이전 페이지
             setNavSlot(slotEl, "◀ 이전 페이지", "⬅", (e) => { e.stopPropagation(); changeDeckPreviewPage(-1); });
         } else if (totalPages > 1 && currentEditorPage > 0 && currentEditorPage === totalPages - 1 && slot === 5) {
-            // 마지막 페이지 우측 하단 (슬롯 5) -> 처음으로
             setNavSlot(slotEl, "처음으로 ↺", "🏠", (e) => { e.stopPropagation(); currentEditorPage = 0; currentSelectedSlot = 0; renderDeckEditor(); });
         } else if (totalPages > 1 && currentEditorPage > 0 && slot === 5) {
-            // 중간 페이지 우측 하단 (슬롯 5) -> 다음 페이지
             setNavSlot(slotEl, "다음 페이지 ▶", "➡", (e) => { e.stopPropagation(); changeDeckPreviewPage(1); });
         } else {
-            // 일반 기능 슬롯
             const currentItemIdx = itemIdx;
             const item = currentItems[currentItemIdx] || { title: "빈 슬롯", icon: "▫️", macro_idx: -1 };
             if (currentSelectedSlot === currentItemIdx) slotEl.classList.add("selected");
@@ -634,15 +637,6 @@ function saveDeckLayoutToServer() {
 // =====================================================================
 // 7. PTZ 카메라 제어 로직
 // =====================================================================
-function updatePTZModeDisplay(mode) {
-    const display = document.getElementById("ptz-port-display");
-    if (!display) return;
-    if (mode === "IP") display.textContent = "모드: VISCA over IP (UDP 52381)";
-    else if (mode === "RS422") display.textContent = `모드: VISCA Serial (${currentServerConfig.PTZ_SERIAL_PORT || 'RS-422'})`;
-    else if (mode === "PELCO-D") display.textContent = "모드: PELCO-D (Baud: 9600 / Hex Cmd)";
-    else if (mode === "ONVIF") display.textContent = "모드: ONVIF Profile S (HTTP SOAP)";
-}
-
 function renderPTZCamTabs() {
     const tabContainer = document.getElementById("ptz-cam-tabs");
     if (!tabContainer) return;
@@ -779,14 +773,97 @@ function renderPTZPresets() {
 }
 
 // =====================================================================
-// 8. 비디오 스위처, 전원 제어 및 설정
+// 8. 비디오 스위처 카탈로그, 동적 채널 렌더링 및 하드웨어 설정
 // =====================================================================
-function sendSwitcher(ch) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "switcher", channel: ch }));
+function renderSwitcherCatalogSelect(catalog, selectedModel) {
+    const sel = document.getElementById("cfg-switcher-model");
+    if (!sel) return;
+    sel.innerHTML = "";
+
+    const groups = {};
+    for (const [key, item] of Object.entries(catalog)) {
+        const brand = item.brand || "기타";
+        if (!groups[brand]) groups[brand] = [];
+        groups[brand].push({ key, ...item });
+    }
+
+    for (const [brand, items] of Object.entries(groups)) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = brand;
+        items.forEach(it => {
+            const opt = document.createElement("option");
+            opt.value = it.key;
+            opt.textContent = `${it.name} (${it.channels}채널)`;
+            if (it.key === selectedModel) opt.selected = true;
+            optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+    }
+}
+
+function renderSwitcherChannels() {
+    const grid = document.getElementById("switcherChannelGrid");
+    const nameLabel = document.getElementById("current-switcher-name");
+    if (!grid) return;
+
+    const modelKey = currentSwitcherConf.model || "atem_mini";
+    const info = switcherCatalog[modelKey] || { name: "Blackmagic ATEM Mini", channels: 4 };
+
+    if (nameLabel) {
+        nameLabel.textContent = `현재 기종: ${info.name} (${info.channels}채널)`;
+    }
+
+    grid.innerHTML = "";
+    for (let ch = 1; ch <= info.channels; ch++) {
+        const btn = document.createElement("button");
+        btn.className = "switcher-btn" + (ch === currentActiveSwitcherChannel ? " active" : "");
+        btn.id = `btn-cam-${ch}`;
+        btn.innerHTML = `<div>CAM ${ch}</div><span class="badge">INPUT ${ch}</span>`;
+        btn.onclick = () => triggerSwitcherCut(ch);
+        grid.appendChild(btn);
+    }
+}
+
+function triggerSwitcherCut(ch) {
+    currentActiveSwitcherChannel = ch;
+    highlightActiveSwitcherButton(ch);
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "switcher", channel: ch }));
+    }
+}
+
+function highlightActiveSwitcherButton(ch) {
+    document.querySelectorAll(".switcher-btn").forEach(b => b.classList.remove("active"));
+    const activeBtn = document.getElementById(`btn-cam-${ch}`);
+    if (activeBtn) activeBtn.classList.add("active");
+}
+
+function onSwitcherModelChange() {
+    const sel = document.getElementById("cfg-switcher-model");
+    if (!sel) return;
+    currentSwitcherConf.model = sel.value;
+    renderSwitcherChannels();
+}
+
+function updateSwitcherStatus(isConnected) {
+    const ind = document.getElementById("switcherStatusIndicator");
+    if (!ind) return;
+    if (isConnected) {
+        ind.textContent = "● 정상 연결됨";
+        ind.style.borderColor = "var(--accent-green)";
+        ind.style.color = "var(--accent-green)";
+    } else {
+        ind.textContent = "● 연결 끊김 / 대기";
+        ind.style.borderColor = "var(--accent-red)";
+        ind.style.color = "var(--accent-red)";
+    }
 }
 
 function sendPower(ch, state) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "power", channel: ch, state: state }));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "power", channel: ch, state: state }));
+    }
 }
 
 function onBrandChange() {
@@ -815,18 +892,35 @@ function onModelChange() {
 }
 
 function saveConfig() {
+    const switcherModel = document.getElementById("cfg-switcher-model") ? document.getElementById("cfg-switcher-model").value : currentSwitcherConf.model;
+    const switcherIp = document.getElementById("cfg-switcher-ip") ? document.getElementById("cfg-switcher-ip").value.trim() : currentSwitcherConf.ip;
+
+    currentSwitcherConf.model = switcherModel;
+    currentSwitcherConf.ip = switcherIp;
+
     const conf = {
         AUDIO_BRAND: document.getElementById("cfg-brand").value,
         AUDIO_TYPE: document.getElementById("cfg-model").value,
         AUDIO_IP: document.getElementById("cfg-audio-ip").value,
         AUDIO_PORT: parseInt(document.getElementById("cfg-audio-port").value),
-        SWITCHER_IP: document.getElementById("cfg-switcher-ip") ? document.getElementById("cfg-switcher-ip").value : "",
+        SWITCHER_MODEL: switcherModel,
+        SWITCHER_IP: switcherIp,
         POWER_IP: document.getElementById("cfg-power-ip") ? document.getElementById("cfg-power-ip").value : ""
     };
 
     openModal("sync-loading");
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "apply_config", config: conf }));
-    alert("설정이 저장되었습니다.");
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        // 서버 환경설정 갱신 및 hub_config.json 스위처 저장
+        ws.send(JSON.stringify({ type: "apply_config", config: conf }));
+        ws.send(JSON.stringify({
+            type: "update_hub_data",
+            macros: macros,
+            deck_pages: deckPages,
+            switcher: currentSwitcherConf
+        }));
+    }
+    renderSwitcherChannels();
 }
 
 function openModal(name) {
@@ -840,7 +934,7 @@ function closeModal(name) {
 }
 
 // =====================================================================
-// 9. WebSocket 연결
+// 9. WebSocket 연결 및 데이터 동기화
 // =====================================================================
 function connectWS() {
     const wsHost = window.location.hostname || '127.0.0.1';
@@ -854,10 +948,26 @@ function connectWS() {
     ws.onmessage = (e) => {
         try {
             const data = JSON.parse(e.data);
+
             if (data.type === "hub_sync" || data.type === "macro_list") {
                 if (data.macros && data.macros.length > 0) macros = data.macros;
                 if (data.deck_pages && Array.isArray(data.deck_pages)) deckPages = data.deck_pages;
                 if (data.schedules) schedules = data.schedules;
+
+                // 스위처 카탈로그 정보 수신
+                if (data.switcher_catalog) {
+                    switcherCatalog = data.switcher_catalog;
+                }
+
+                // 현재 저장된 스위처 설정 수신
+                if (data.switcher) {
+                    currentSwitcherConf = data.switcher;
+                    const swIpInput = document.getElementById("cfg-switcher-ip");
+                    if (swIpInput) swIpInput.value = currentSwitcherConf.ip || "";
+                }
+
+                renderSwitcherCatalogSelect(switcherCatalog, currentSwitcherConf.model || "atem_mini");
+                renderSwitcherChannels();
                 renderMacros();
                 renderSchedules();
                 renderDeckEditor();
@@ -865,6 +975,19 @@ function connectWS() {
             else if (data.type === "sys_config") {
                 currentServerConfig = data.config || {};
                 renderPTZCamTabs();
+
+                if (currentServerConfig.SWITCHER_MODEL) {
+                    currentSwitcherConf.model = currentServerConfig.SWITCHER_MODEL;
+                }
+                if (currentServerConfig.SWITCHER_IP) {
+                    currentSwitcherConf.ip = currentServerConfig.SWITCHER_IP;
+                    const swIpInput = document.getElementById("cfg-switcher-ip");
+                    if (swIpInput) swIpInput.value = currentServerConfig.SWITCHER_IP;
+                }
+
+                updateSwitcherStatus(Boolean(currentServerConfig.SWITCHER_CONNECTED));
+                renderSwitcherCatalogSelect(switcherCatalog, currentSwitcherConf.model);
+                renderSwitcherChannels();
             }
             else if (data.type === "metadata") {
                 if (data.banks && data.banks.length > 0) {
@@ -876,7 +999,6 @@ function connectWS() {
             }
             else if (data.type === "sync_complete") {
                 closeModal("sync-loading");
-                switchView("overview");
             }
         } catch (err) {
             console.error("WS Parse Error:", err);
@@ -886,6 +1008,7 @@ function connectWS() {
     ws.onclose = () => {
         const act = document.getElementById("active-info");
         if (act) { act.textContent = "ACTIVE: RECONNECTING..."; act.style.color = "var(--accent-red)"; }
+        updateSwitcherStatus(false);
         setTimeout(connectWS, 2000);
     };
 }

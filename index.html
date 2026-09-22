@@ -11,6 +11,51 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* 비디오 스위처 컷 그리드 스타일 보강 */
+        .switcher-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .switcher-btn {
+            background: #1e222d;
+            border: 2px solid #323846;
+            color: #f0f6fc;
+            padding: 24px 10px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .switcher-btn:hover {
+            border-color: #58a6ff;
+            background: #252b38;
+        }
+
+        .switcher-btn:active, .switcher-btn.active {
+            background: #e02424 !important;
+            border-color: #ff5c5c !important;
+            color: #ffffff !important;
+            transform: scale(0.96);
+            box-shadow: 0 0 16px rgba(224, 36, 36, 0.7);
+        }
+
+        .switcher-btn span.badge {
+            font-size: 11px;
+            color: #8b949e;
+            font-weight: normal;
+        }
     </style>
 </head>
 <body>
@@ -57,7 +102,7 @@
             <div class="nav-item" data-view="power" onclick="switchView('power')">순차전원분배기 메뉴</div>
             <div class="nav-item" data-view="scheduler" onclick="switchView('scheduler')">스케줄러 동기화</div>
             <div class="nav-item" data-view="deck" onclick="switchView('deck')">터치 패널 UI 설정</div>
-            <div class="nav-item" data-view="settings" onclick="switchView('settings')" style="margin-top: auto;">⚙ 설정</div>
+            <div class="nav-item" data-view="settings" onclick="switchView('settings')" style="margin-top: auto;">⚙ 하드웨어 설정</div>
         </div>
         <div class="nav-item" onclick="handleLogout()" style="color: var(--accent-red); border-top: 1px solid var(--border); margin-top: 8px; padding-top: 12px; cursor: pointer;">
             로그아웃
@@ -126,17 +171,18 @@
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;" id="ptz-preset-grid"></div>
         </div>
 
-        <!-- 4. 비디오 스위처 -->
+        <!-- 4. 비디오 스위처 제어 뷰 (단독 탭) -->
         <div id="view-switcher" class="view-section">
             <div class="view-header">
-                <div class="view-title">VIDEO SWITCHER MENU</div>
+                <div>
+                    <div class="view-title">비디오 스위처 PGM 제어</div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="current-switcher-name">현재 기종: Blackmagic ATEM Mini (4채널)</div>
+                </div>
+                <span id="switcherStatusIndicator" style="font-size: 13px; font-weight: bold; padding: 4px 10px; border-radius: 12px; background: #222; border: 1px solid #444;">● 연결 확인 중</span>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(1)">카메라 1 (PGM)</button>
-                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(2)">카메라 2 (PGM)</button>
-                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(3)">카메라 3 (PGM)</button>
-                <button class="fluent-btn primary" style="height: 70px; font-size: 15px;" onclick="sendSwitcher(4)">PC / PPT 화면</button>
-            </div>
+
+            <!-- 기종별 채널 수에 맞춰 동적으로 생성되는 컷 버튼 그리드 -->
+            <div class="switcher-grid" id="switcherChannelGrid"></div>
         </div>
 
         <!-- 5. 순차전원 -->
@@ -150,7 +196,7 @@
             </div>
         </div>
 
-        <!-- 6. 터치 패널 UI 설정 (단일 통합 & 중앙 정렬) -->
+        <!-- 6. 터치 패널 UI 설정 -->
         <div id="view-deck" class="view-section">
             <div class="view-header">
                 <div>
@@ -162,7 +208,6 @@
                 </button>
             </div>
 
-            <!-- 페이지 전환 & 관리 바 -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin: 0 auto 16px auto; width: 100%; max-width: 680px; background: var(--bg-surface); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <button class="fluent-btn" type="button" onclick="changeDeckPreviewPage(-1)">◀ 이전 페이지</button>
@@ -175,12 +220,10 @@
                 </div>
             </div>
 
-            <!-- 2x3 시각적 프리뷰 캔버스 -->
             <div class="deck-mapping-canvas">
                 <div id="deck-editor-grid"></div>
             </div>
 
-            <!-- 선택 슬롯 설정 패널 -->
             <div id="slot-config-panel" style="width: 100%; max-width: 680px; margin: 20px auto 0 auto; padding: 20px; background: #161b22; border-radius: 12px; border: 1px solid #30363d; display: none; box-sizing: border-box;">
                 <h3 id="selected-slot-title" style="margin-top: 0; font-size: 15px; color: #58a6ff; margin-bottom: 12px;">슬롯 설정</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 14px; align-items: end;">
@@ -227,7 +270,7 @@
             </div>
         </div>
 
-        <!-- 8. 하드웨어 설정 -->
+        <!-- 8. 하드웨어 설정 (비디오 스위처 기종/IP 포함) -->
         <div id="view-settings" class="view-section">
             <div class="view-header">
                 <div class="view-title">하드웨어 연결 & 통신 설정</div>
@@ -257,12 +300,21 @@
                     <label>콘솔 통신 포트</label>
                     <input type="number" id="cfg-audio-port" value="2223">
                 </div>
+
+                <!-- 비디오 스위처 기종 선택 드롭다운 -->
                 <div class="form-group">
-                    <label>비디오 스위처 IP</label>
-                    <input type="text" id="cfg-switcher-ip" value="192.168.219.110">
+                    <label>비디오 스위처 기종</label>
+                    <select id="cfg-switcher-model" onchange="onSwitcherModelChange()">
+                        <!-- JS에서 동적으로 기종 및 제조사 optgroup 생성 -->
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label>순차전원분배기 IP</label>
+                    <label>비디오 스위처 IP 주소</label>
+                    <input type="text" id="cfg-switcher-ip" value="192.168.219.10">
+                </div>
+
+                <div class="form-group">
+                    <label>순차전원분배기 IP 주소</label>
                     <input type="text" id="cfg-power-ip" value="192.168.219.140">
                 </div>
             </div>

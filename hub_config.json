@@ -1,4 +1,9 @@
 {
+  "switcher": {
+    "model": "atem_mini",
+    "ip": "192.168.219.10",
+    "enabled": true
+  },
   "macros": [
     {
       "name": "전체 순차 켜기",
@@ -8,12 +13,15 @@
       "unmutes": [
         "ch/1"
       ],
+      "mutes": [],
       "ptz_cam": 1,
-      "ptz": 1
+      "ptz": 1,
+      "switcher": 3
     },
     {
-      "name": "설교 / 발언",
+      "name": "스피치",
       "desc": "강단 마이크 오픈 / 타이트 샷",
+      "power": null,
       "snap": 2,
       "unmutes": [
         "ch/1"
@@ -24,11 +32,12 @@
       ],
       "ptz_cam": 1,
       "ptz": 2,
-      "switcher": 2
+      "switcher": 4
     },
     {
-      "name": "찬양 / 밴드",
+      "name": "밴드 풀샷",
       "desc": "악기군 오픈 / 와이드 풀샷",
+      "power": null,
       "snap": 3,
       "unmutes": [
         "ch/1",
@@ -36,13 +45,15 @@
         "ch/3",
         "ch/4"
       ],
+      "mutes": [],
       "ptz_cam": 2,
       "ptz": 3,
       "switcher": 1
     },
     {
-      "name": "성찬 / 기도",
+      "name": "무대조명 on",
       "desc": "차분한 조명 / BGM 채널만 오픈",
+      "power": null,
       "snap": 1,
       "unmutes": [
         "ch/5"
@@ -51,7 +62,8 @@
         "ch/1"
       ],
       "ptz_cam": 1,
-      "ptz": 4
+      "ptz": 4,
+      "switcher": null
     },
     {
       "name": "영상 상영",
@@ -78,17 +90,17 @@
     [
       {
         "title": "전체 on",
-        "icon": "미디어시스템 ON",
+        "icon": "시스템 ON",
         "macro_idx": 0
       },
       {
         "title": "카메라 1, 음향 프리셋",
-        "icon": "유치1부",
+        "icon": "2번프리셋",
         "macro_idx": 1
       },
       {
         "title": "카메라 1, 음향 프리셋",
-        "icon": "유치2부",
+        "icon": "3번프리셋",
         "macro_idx": 2
       },
       {
